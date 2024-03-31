@@ -1,206 +1,215 @@
-import * as cheerio from 'cheerio';
-import type * as DOM from 'domhandler';
-import { Base64 } from 'js-base64';
-import makeFetch from 'node-fetch-cookie-native';
+/* eslint-disable prefer-promise-reject-errors */
+import * as cheerio from 'cheerio'
+import type * as DOM from 'domhandler'
+import { Base64 } from 'js-base64'
+import makeFetch from 'node-fetch-cookie-native'
 
-import * as URLS from './urls';
-import {
-  CredentialProvider,
-  Fetch,
-  HelperConfig,
-  ContentType,
+import * as URLS from './urls'
+import type {
+  ApiError,
+  CalendarEvent,
+  ContentTypeMap,
   CourseContent,
   CourseInfo,
+  CredentialProvider,
   Discussion,
-  FailReason,
+  Fetch,
   File,
+  HelperConfig,
   Homework,
+  HomeworkTA,
   IDiscussionBase,
   IHomeworkDetail,
   IHomeworkStatus,
+  IHomeworkSubmitAttachment,
+  IHomeworkSubmitResult,
   INotification,
   INotificationDetail,
   Notification,
   Question,
-  SemesterInfo,
-  CourseType,
-  CalendarEvent,
-  ApiError,
   RemoteFile,
-  IHomeworkSubmitAttachment,
-  IHomeworkSubmitResult,
-  Language,
-  HomeworkTA,
+  SemesterInfo,
   UserInfo,
-  ContentTypeMap,
-} from './types';
+} from './types'
 import {
+  ContentType,
+  CourseType,
+  FailReason,
+  Language,
+} from './types'
+import {
+  GRADE_LEVEL_MAP,
+  JSONP_EXTRACTOR_NAME,
   decodeHTML,
+  extractJSONPResult,
   parseSemesterType,
   trimAndDefine,
-  JSONP_EXTRACTOR_NAME,
-  extractJSONPResult,
-  GRADE_LEVEL_MAP,
-} from './utils';
+} from './utils'
 
 const CHEERIO_CONFIG: cheerio.CheerioOptions = {
   // _useHtmlParser2
   xml: true,
   decodeEntities: false,
-};
+}
 
-const $ = (html: string | DOM.Element | DOM.Element[]): cheerio.CheerioAPI => {
-  return cheerio.load(html, CHEERIO_CONFIG);
-};
+function $(html: string | DOM.Element | DOM.Element[]): cheerio.CheerioAPI {
+  return cheerio.load(html, CHEERIO_CONFIG)
+}
 
-const noLogin = (res: Response) => res.url.includes('login_timeout') || res.status == 403;
+const noLogin = (res: Response) => res.url.includes('login_timeout') || res.status === 403
 
 /** add CSRF token to any request URL as parameters */
-export const addCSRFTokenToUrl = (url: string, token: string): string => {
-  const newUrl = new URL(url);
-  newUrl.searchParams.set('_csrf', token);
-  return newUrl.toString();
-};
+export function addCSRFTokenToUrl(url: string, token: string): string {
+  const newUrl = new URL(url)
+  newUrl.searchParams.set('_csrf', token)
+  return newUrl.toString()
+}
 
 /** the main helper class */
 export class Learn2018Helper {
-  readonly #provider?: CredentialProvider;
-  readonly #rawFetch: Fetch;
-  readonly #myFetch: Fetch;
+  readonly #provider?: CredentialProvider
+  readonly #rawFetch: Fetch
+  readonly #myFetch: Fetch
   readonly #myFetchWithToken: Fetch = async (...args) => {
-    if (this.#csrfToken == '') {
-      await this.login();
-    }
-    const [url, ...remaining] = args;
-    return this.#myFetch(addCSRFTokenToUrl(url as string, this.#csrfToken), ...remaining);
-  };
-  #csrfToken = '';
-  #lang = Language.ZH;
+    if (this.#csrfToken)
+      await this.login()
+
+    const [url, ...remaining] = args
+    return this.#myFetch(addCSRFTokenToUrl(url as string, this.#csrfToken), ...remaining)
+  }
+
+  #csrfToken = ''
+  #lang = Language.ZH
 
   readonly #withReAuth = (rawFetch: Fetch): Fetch => {
-    const login = this.login.bind(this);
+    const login = this.login.bind(this)
     return async function wrappedFetch(...args) {
       const retryAfterLogin = async () => {
-        await login();
+        await login()
         return await rawFetch(...args).then((res: Response) => {
           if (noLogin(res)) {
             return Promise.reject({
               reason: FailReason.NOT_LOGGED_IN,
-            } as ApiError);
-          } else if (res.status != 200) {
+            } as ApiError)
+          }
+          else if (res.status !== 200) {
             return Promise.reject({
               reason: FailReason.UNEXPECTED_STATUS,
               extra: {
                 code: res.status,
                 text: res.statusText,
               },
-            } as ApiError);
-          } else {
-            return res;
+            } as ApiError)
           }
-        });
-      };
-      return await rawFetch(...args).then((res: Response) => (noLogin(res) ? retryAfterLogin() : res));
-    };
-  };
+          else {
+            return res
+          }
+        })
+      }
+      return await rawFetch(...args).then((res: Response) => (noLogin(res) ? retryAfterLogin() : res))
+    }
+  }
 
-  public previewFirstPage: boolean;
+  public previewFirstPage: boolean
 
   /** you can provide a CookieJar and / or CredentialProvider in the configuration */
   constructor(config?: HelperConfig) {
-    this.previewFirstPage = config?.generatePreviewUrlForFirstPage ?? true;
-    this.#provider = config?.provider;
-    this.#rawFetch = config?.fetch ?? makeFetch(config?.cookieJar);
+    this.previewFirstPage = config?.generatePreviewUrlForFirstPage ?? true
+    this.#provider = config?.provider
+    this.#rawFetch = config?.fetch ?? makeFetch(config?.cookieJar)
     this.#myFetch = this.#provider
       ? this.#withReAuth(this.#rawFetch)
       : async (...args) => {
-          const result = await this.#rawFetch(...args);
-          if (noLogin(result))
-            return Promise.reject({
-              reason: FailReason.NOT_LOGGED_IN,
-            } as ApiError);
-          return result;
-        };
+        const result = await this.#rawFetch(...args)
+        if (noLogin(result)) {
+          return Promise.reject({
+            reason: FailReason.NOT_LOGGED_IN,
+          } as ApiError)
+        }
+        return result
+      }
   }
 
   /** fetch CSRF token from helper (invalid after login / re-login), might be '' if not logged in */
   public getCSRFToken(): string {
-    return this.#csrfToken;
+    return this.#csrfToken
   }
 
   /** login is necessary if you do not provide a `CredentialProvider` */
   public async login(username?: string, password?: string): Promise<void> {
     if (!username || !password) {
-      if (!this.#provider)
+      if (!this.#provider) {
         return Promise.reject({
           reason: FailReason.NO_CREDENTIAL,
-        } as ApiError);
-      const credential = await this.#provider();
-      username = credential.username;
-      password = credential.password;
+        } as ApiError)
+      }
+      const credential = await this.#provider()
+      username = credential.username
+      password = credential.password
       if (!username || !password) {
         return Promise.reject({
           reason: FailReason.NO_CREDENTIAL,
-        } as ApiError);
+        } as ApiError)
       }
     }
     const ticketResponse = await this.#rawFetch(URLS.ID_LOGIN(), {
       body: URLS.ID_LOGIN_FORM_DATA(username, password),
       method: 'POST',
-    });
+    })
     if (!ticketResponse.ok) {
       return Promise.reject({
         reason: FailReason.ERROR_FETCH_FROM_ID,
-      } as ApiError);
+      } as ApiError)
     }
     // check response from id.tsinghua.edu.cn
-    const ticketResult = await ticketResponse.text();
-    const body = $(ticketResult);
-    const targetURL = body('a').attr('href') as string;
-    const ticket = targetURL.split('=').slice(-1)[0];
+    const ticketResult = await ticketResponse.text()
+    const body = $(ticketResult)
+    const targetURL = body('a').attr('href') as string
+    const ticket = targetURL.split('=').slice(-1)[0]
     if (ticket === 'BAD_CREDENTIALS') {
       return Promise.reject({
         reason: FailReason.BAD_CREDENTIAL,
-      } as ApiError);
+      } as ApiError)
     }
-    const loginResponse = await this.#rawFetch(URLS.LEARN_AUTH_ROAM(ticket));
+    const loginResponse = await this.#rawFetch(URLS.LEARN_AUTH_ROAM(ticket))
     if (loginResponse.ok !== true) {
       return Promise.reject({
         reason: FailReason.ERROR_ROAMING,
-      } as ApiError);
+      } as ApiError)
     }
-    const courseListPageSource: string = await (await this.#rawFetch(URLS.LEARN_STUDENT_COURSE_LIST_PAGE())).text();
-    const tokenRegex = /^.*&_csrf=(\S*)".*$/gm;
-    const tokenMatches = [...courseListPageSource.matchAll(tokenRegex)];
-    if (tokenMatches.length == 0) {
+    const courseListPageSource: string = await (await this.#rawFetch(URLS.LEARN_STUDENT_COURSE_LIST_PAGE())).text()
+    const tokenRegex = /^.*&_csrf=(\S*)".*$/gm
+    const tokenMatches = [...courseListPageSource.matchAll(tokenRegex)]
+    if (tokenMatches.length === 0) {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: 'cannot fetch CSRF token from source',
-      } as ApiError);
+      } as ApiError)
     }
-    this.#csrfToken = tokenMatches[0][1];
-    const langRegex = /<script src="\/f\/wlxt\/common\/languagejs\?lang=(zh|en)"><\/script>/g;
-    const langMatches = [...courseListPageSource.matchAll(langRegex)];
-    if (langMatches.length !== 0) this.#lang = langMatches[0][1] as Language;
+    this.#csrfToken = tokenMatches[0][1]
+    const langRegex = /<script src="\/f\/wlxt\/common\/languagejs\?lang=(zh|en)"><\/script>/g
+    const langMatches = [...courseListPageSource.matchAll(langRegex)]
+    if (langMatches.length !== 0)
+      this.#lang = langMatches[0][1] as Language
   }
 
   /**  logout (to make everyone happy) */
   public async logout(): Promise<void> {
-    await this.#rawFetch(URLS.LEARN_LOGOUT(), { method: 'POST' });
+    await this.#rawFetch(URLS.LEARN_LOGOUT(), { method: 'POST' })
   }
 
   /** get user's name and department */
   public async getUserInfo(courseType = CourseType.STUDENT): Promise<UserInfo> {
-    const content = await (await this.#myFetchWithToken(URLS.LEARN_HOMEPAGE(courseType))).text();
+    const content = await (await this.#myFetchWithToken(URLS.LEARN_HOMEPAGE(courseType))).text()
 
-    const dom = $(content);
-    const name = dom('a.user-log').text().trim();
-    const department = dom('.fl.up-img-info p:nth-child(2) label').text().trim();
+    const dom = $(content)
+    const name = dom('a.user-log').text().trim()
+    const department = dom('.fl.up-img-info p:nth-child(2) label').text().trim()
 
     return {
       name,
       department,
-    };
+    }
   }
 
   /**
@@ -215,57 +224,57 @@ export class Learn2018Helper {
     const ticketResponse = await this.#myFetchWithToken(URLS.REGISTRAR_TICKET(), {
       method: 'POST',
       body: URLS.REGISTRAR_TICKET_FORM_DATA(),
-    });
+    })
 
-    let ticket = (await ticketResponse.text()) as string;
-    ticket = ticket.substring(1, ticket.length - 1);
+    let ticket = (await ticketResponse.text()) as string
+    ticket = ticket.substring(1, ticket.length - 1)
 
-    await this.#myFetch(URLS.REGISTRAR_AUTH(ticket));
+    await this.#myFetch(URLS.REGISTRAR_AUTH(ticket))
 
     const response = await this.#myFetchWithToken(
       URLS.REGISTRAR_CALENDAR(startDate, endDate, graduate, JSONP_EXTRACTOR_NAME),
-    );
+    )
 
     if (!response.ok) {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
-      } as ApiError);
+      } as ApiError)
     }
 
-    const result = extractJSONPResult(await response.text()) as any[];
+    const result = extractJSONPResult(await response.text()) as any[]
 
-    return result.map<CalendarEvent>((i) => ({
+    return result.map<CalendarEvent>(i => ({
       location: i.dd,
       status: i.fl,
       startTime: i.kssj,
       endTime: i.jssj,
       date: i.nq,
       courseName: i.nr,
-    }));
+    }))
   }
 
   public async getSemesterIdList(): Promise<string[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_SEMESTER_LIST())).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_SEMESTER_LIST())).json()
     if (!Array.isArray(json)) {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
-    const semesters = json as string[];
+    const semesters = json as string[]
     // sometimes web learning returns null, so confusing...
-    return semesters.filter((s) => s != null);
+    return semesters.filter(s => s != null)
   }
 
   public async getCurrentSemester(): Promise<SemesterInfo> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_CURRENT_SEMESTER())).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_CURRENT_SEMESTER())).json()
     if (json.message !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
-    const result = json.result;
+    const result = json.result
     return {
       id: result.id,
       startDate: new Date(result.kssj),
@@ -273,30 +282,31 @@ export class Learn2018Helper {
       startYear: Number(result.xnxq.slice(0, 4)),
       endYear: Number(result.xnxq.slice(5, 9)),
       type: parseSemesterType(Number(result.xnxq.slice(10, 11))),
-    };
+    }
   }
 
   /** get all courses in the specified semester */
   public async getCourseList(semesterID: string, courseType: CourseType = CourseType.STUDENT): Promise<CourseInfo[]> {
     const json = await (
       await this.#myFetchWithToken(URLS.LEARN_COURSE_LIST(semesterID, courseType, this.#lang))
-    ).json();
+    ).json()
     if (json.message !== 'success' || !Array.isArray(json.resultList)) {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
-    const result = (json.resultList ?? []) as any[];
-    const courses: CourseInfo[] = [];
+    const result = (json.resultList ?? []) as any[]
+    const courses: CourseInfo[] = []
 
     await Promise.all(
       result.map(async (c) => {
-        let timeAndLocation: string[] = [];
+        let timeAndLocation: string[] = []
         try {
           // see https://github.com/Harry-Chen/Learn-Helper/issues/145
-          timeAndLocation = await (await this.#myFetchWithToken(URLS.LEARN_COURSE_TIME_LOCATION(c.wlkcid))).json();
-        } catch (e) {
+          timeAndLocation = await (await this.#myFetchWithToken(URLS.LEARN_COURSE_TIME_LOCATION(c.wlkcid))).json()
+        }
+        catch (e) {
           /** ignore */
         }
         courses.push({
@@ -311,11 +321,11 @@ export class Learn2018Helper {
           courseNumber: c.kch,
           courseIndex: Number(c.kxh), // c.kxh could be string (teacher mode) or number (student mode)
           courseType,
-        });
+        })
       }),
-    );
+    )
 
-    return courses;
+    return courses
   }
 
   /**
@@ -331,45 +341,45 @@ export class Learn2018Helper {
     const fetchContentForCourse = <T extends ContentType>(type: T, id: string, courseType: CourseType) => {
       switch (type) {
         case ContentType.NOTIFICATION:
-          return this.getNotificationList(id, courseType) as Promise<ContentTypeMap[T][]>;
+          return this.getNotificationList(id, courseType) as Promise<ContentTypeMap[T][]>
         case ContentType.FILE:
-          return this.getFileList(id, courseType) as Promise<ContentTypeMap[T][]>;
+          return this.getFileList(id, courseType) as Promise<ContentTypeMap[T][]>
         case ContentType.HOMEWORK:
-          return this.getHomeworkList(id) as Promise<ContentTypeMap[T][]>;
+          return this.getHomeworkList(id) as Promise<ContentTypeMap[T][]>
         case ContentType.DISCUSSION:
-          return this.getDiscussionList(id, courseType) as Promise<ContentTypeMap[T][]>;
+          return this.getDiscussionList(id, courseType) as Promise<ContentTypeMap[T][]>
         case ContentType.QUESTION:
-          return this.getAnsweredQuestionList(id, courseType) as Promise<ContentTypeMap[T][]>;
+          return this.getAnsweredQuestionList(id, courseType) as Promise<ContentTypeMap[T][]>
         default:
           return Promise.reject({
             reason: FailReason.NOT_IMPLEMENTED,
             extra: 'Unknown content type',
-          } as ApiError);
+          } as ApiError)
       }
-    };
+    }
 
-    const contents: CourseContent<T> = {};
+    const contents: CourseContent<T> = {}
 
     const results = await Promise.allSettled(
       courseIDs.map(async (id) => {
-        contents[id] = await fetchContentForCourse(type, id, courseType);
+        contents[id] = await fetchContentForCourse(type, id, courseType)
       }),
-    );
+    )
 
     if (!allowFailure) {
       for (const r of results) {
-        if (r.status == 'rejected') {
+        if (r.status === 'rejected') {
           return Promise.reject({
             reason: FailReason.INVALID_RESPONSE,
             extra: {
               reason: r.reason,
             },
-          } as ApiError);
+          } as ApiError)
         }
       }
     }
 
-    return contents;
+    return contents
   }
 
   /** Get all notifications （课程公告） of the specified course. */
@@ -377,16 +387,16 @@ export class Learn2018Helper {
     courseID: string,
     courseType: CourseType = CourseType.STUDENT,
   ): Promise<Notification[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_NOTIFICATION_LIST(courseID, courseType))).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_NOTIFICATION_LIST(courseID, courseType))).json()
     if (json.result !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
 
-    const result = (json.object?.aaData ?? json.object?.resultsList ?? []) as any[];
-    const notifications: Notification[] = [];
+    const result = (json.object?.aaData ?? json.object?.resultsList ?? []) as any[]
+    const notifications: Notification[] = []
 
     await Promise.all(
       result.map(async (n) => {
@@ -399,48 +409,49 @@ export class Learn2018Helper {
           hasRead: n.sfyd === '是',
           markedImportant: Number(n.sfqd) === 1, // n.sfqd could be string '1' (teacher mode) or number 1 (student mode)
           publishTime: new Date(n.fbsj && typeof n.fbsj === 'string' ? n.fbsj : n.fbsjStr),
-        };
-        let detail: INotificationDetail = {};
-        const attachmentName = courseType === CourseType.STUDENT ? n.fjmc : n.fjbt;
-        if (attachmentName) {
-          detail = await this.parseNotificationDetail(courseID, notification.id, courseType, attachmentName);
         }
-        notifications.push({ ...notification, ...detail });
-      }),
-    );
+        let detail: INotificationDetail = {}
+        const attachmentName = courseType === CourseType.STUDENT ? n.fjmc : n.fjbt
+        if (attachmentName)
+          detail = await this.parseNotificationDetail(courseID, notification.id, courseType, attachmentName)
 
-    return notifications;
+        notifications.push({ ...notification, ...detail })
+      }),
+    )
+
+    return notifications
   }
 
   /** Get all files （课程文件） of the specified course. */
   public async getFileList(courseID: string, courseType: CourseType = CourseType.STUDENT): Promise<File[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_FILE_LIST(courseID, courseType))).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_FILE_LIST(courseID, courseType))).json()
     if (json.result !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
 
-    let result: any[] = [];
+    let result: any[] = []
     if (Array.isArray(json.object?.resultsList)) {
       // teacher
-      result = json.object.resultsList;
-    } else if (Array.isArray(json.object)) {
-      // student
-      result = json.object;
+      result = json.object.resultsList
     }
-    const files: File[] = [];
+    else if (Array.isArray(json.object)) {
+      // student
+      result = json.object
+    }
+    const files: File[] = []
 
     await Promise.all(
       result.map(async (f) => {
-        const title = decodeHTML(f.bt);
+        const title = decodeHTML(f.bt)
         const downloadUrl = URLS.LEARN_FILE_DOWNLOAD(
           courseType === CourseType.STUDENT ? f.wjid : f.id,
           courseType,
           courseID,
-        );
-        const previewUrl = URLS.LEARN_FILE_PREVIEW(ContentType.FILE, f.wjid, courseType, this.previewFirstPage);
+        )
+        const previewUrl = URLS.LEARN_FILE_PREVIEW(ContentType.FILE, f.wjid, courseType, this.previewFirstPage)
         files.push({
           id: f.wjid,
           title: decodeHTML(f.bt),
@@ -462,32 +473,32 @@ export class Learn2018Helper {
             previewUrl,
             size: f.fileSize,
           },
-        });
+        })
       }),
-    );
+    )
 
-    return files;
+    return files
   }
 
   /** Get all homeworks （课程作业） of the specified course. */
-  public async getHomeworkList(courseID: string): Promise<Homework[]>;
-  public async getHomeworkList(courseID: string, courseType: CourseType.STUDENT): Promise<Homework[]>;
-  public async getHomeworkList(courseID: string, courseType: CourseType.TEACHER): Promise<HomeworkTA[]>;
+  public async getHomeworkList(courseID: string): Promise<Homework[]>
+  public async getHomeworkList(courseID: string, courseType: CourseType.STUDENT): Promise<Homework[]>
+  public async getHomeworkList(courseID: string, courseType: CourseType.TEACHER): Promise<HomeworkTA[]>
   public async getHomeworkList(
     courseID: string,
     courseType: CourseType = CourseType.STUDENT,
   ): Promise<Homework[] | HomeworkTA[]> {
     if (courseType === CourseType.TEACHER) {
-      const json = await (await this.#myFetchWithToken(URLS.LEARN_HOMEWORK_LIST_TEACHER(courseID))).json();
+      const json = await (await this.#myFetchWithToken(URLS.LEARN_HOMEWORK_LIST_TEACHER(courseID))).json()
       if (json.result !== 'success') {
         return Promise.reject({
           reason: FailReason.INVALID_RESPONSE,
           extra: json,
-        } as ApiError);
+        } as ApiError)
       }
 
-      const result = (json.object?.aaData ?? []) as any[];
-      const homeworks: HomeworkTA[] = [];
+      const result = (json.object?.aaData ?? []) as any[]
+      const homeworks: HomeworkTA[] = []
 
       await Promise.all(
         result.map(async (d) => {
@@ -506,37 +517,38 @@ export class Learn2018Helper {
             gradedCount: d.ypys,
             submittedCount: d.yjs,
             unsubmittedCount: d.wjs,
-          });
+          })
         }),
-      );
+      )
 
-      return homeworks;
-    } else {
-      const allHomework: Homework[] = [];
+      return homeworks
+    }
+    else {
+      const allHomework: Homework[] = []
 
       await Promise.all(
         URLS.LEARN_HOMEWORK_LIST_SOURCE(courseID).map(async (s) => {
-          const homeworks = await this.getHomeworkListAtUrl(s.url, s.status);
-          allHomework.push(...homeworks);
+          const homeworks = await this.getHomeworkListAtUrl(s.url, s.status)
+          allHomework.push(...homeworks)
         }),
-      );
+      )
 
-      return allHomework;
+      return allHomework
     }
   }
 
   /** Get all discussions （课程讨论） of the specified course. */
   public async getDiscussionList(courseID: string, courseType: CourseType = CourseType.STUDENT): Promise<Discussion[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_DISCUSSION_LIST(courseID, courseType))).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_DISCUSSION_LIST(courseID, courseType))).json()
     if (json.result !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
 
-    const result = (json.object?.resultsList ?? []) as any[];
-    const discussions: Discussion[] = [];
+    const result = (json.object?.resultsList ?? []) as any[]
+    const discussions: Discussion[] = []
 
     await Promise.all(
       result.map(async (d) => {
@@ -544,11 +556,11 @@ export class Learn2018Helper {
           ...this.parseDiscussionBase(d),
           boardId: d.bqid,
           url: URLS.LEARN_DISCUSSION_DETAIL(d.wlkcid, d.bqid, d.id, courseType),
-        });
+        })
       }),
-    );
+    )
 
-    return discussions;
+    return discussions
   }
 
   /**
@@ -559,16 +571,16 @@ export class Learn2018Helper {
     courseID: string,
     courseType: CourseType = CourseType.STUDENT,
   ): Promise<Question[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_QUESTION_LIST_ANSWERED(courseID, courseType))).json();
+    const json = await (await this.#myFetchWithToken(URLS.LEARN_QUESTION_LIST_ANSWERED(courseID, courseType))).json()
     if (json.result !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
 
-    const result = (json.object?.resultsList ?? []) as any[];
-    const questions: Question[] = [];
+    const result = (json.object?.resultsList ?? []) as any[]
+    const questions: Question[] = []
 
     await Promise.all(
       result.map(async (q) => {
@@ -576,24 +588,24 @@ export class Learn2018Helper {
           ...this.parseDiscussionBase(q),
           question: Base64.decode(q.wtnr),
           url: URLS.LEARN_QUESTION_DETAIL(q.wlkcid, q.id, courseType),
-        });
+        })
       }),
-    );
+    )
 
-    return questions;
+    return questions
   }
 
   private async getHomeworkListAtUrl(url: string, status: IHomeworkStatus): Promise<Homework[]> {
-    const json = await (await this.#myFetchWithToken(url)).json();
+    const json = await (await this.#myFetchWithToken(url)).json()
     if (json.result !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
         extra: json,
-      } as ApiError);
+      } as ApiError)
     }
 
-    const result = (json.object?.aaData ?? []) as any[];
-    const homeworks: Homework[] = [];
+    const result = (json.object?.aaData ?? []) as any[]
+    const homeworks: Homework[] = []
 
     await Promise.all(
       result.map(async (h) => {
@@ -612,11 +624,11 @@ export class Learn2018Helper {
           gradeTime: h.pysj === null ? undefined : new Date(h.pysj),
           ...status,
           ...(await this.parseHomeworkDetail(h.wlkcid, h.zyid, h.xszyid)),
-        });
+        })
       }),
-    );
+    )
 
-    return homeworks;
+    return homeworks
   }
 
   private async parseNotificationDetail(
@@ -635,20 +647,20 @@ export class Learn2018Helper {
     // })).json();
     // const attachmentId = metadata.ggfjid as string;
     /// parsed from HTML
-    const response = await this.#myFetchWithToken(URLS.LEARN_NOTIFICATION_DETAIL(courseID, id, courseType));
-    const result = $(await response.text());
-    let path = '';
-    if (courseType === CourseType.STUDENT) {
-      path = result('.ml-10').attr('href')!;
-    } else {
-      path = result('#wjid').attr('href')!;
-    }
-    const size = trimAndDefine(result('div#attachment > div.fl > span[class^="color"]').first().text())!;
-    const params = new URLSearchParams(path.split('?').slice(-1)[0]);
-    const attachmentId = params.get('wjid')!;
-    if (!path.startsWith(URLS.LEARN_PREFIX)) {
-      path = URLS.LEARN_PREFIX + path;
-    }
+    const response = await this.#myFetchWithToken(URLS.LEARN_NOTIFICATION_DETAIL(courseID, id, courseType))
+    const result = $(await response.text())
+    let path = ''
+    if (courseType === CourseType.STUDENT)
+      path = result('.ml-10').attr('href')!
+    else
+      path = result('#wjid').attr('href')!
+
+    const size = trimAndDefine(result('div#attachment > div.fl > span[class^="color"]').first().text())!
+    const params = new URLSearchParams(path.split('?').slice(-1)[0])
+    const attachmentId = params.get('wjid')!
+    if (!path.startsWith(URLS.LEARN_PREFIX))
+      path = URLS.LEARN_PREFIX + path
+
     return {
       attachment: {
         name: attachmentName,
@@ -657,14 +669,14 @@ export class Learn2018Helper {
         previewUrl: URLS.LEARN_FILE_PREVIEW(ContentType.NOTIFICATION, attachmentId, courseType, this.previewFirstPage),
         size,
       },
-    };
+    }
   }
 
   private async parseHomeworkDetail(courseID: string, id: string, studentHomeworkID: string): Promise<IHomeworkDetail> {
-    const response = await this.#myFetchWithToken(URLS.LEARN_HOMEWORK_DETAIL(courseID, id, studentHomeworkID));
-    const result = $(await response.text());
+    const response = await this.#myFetchWithToken(URLS.LEARN_HOMEWORK_DETAIL(courseID, id, studentHomeworkID))
+    const result = $(await response.text())
 
-    const fileDivs = result('div.list.fujian.clearfix');
+    const fileDivs = result('div.list.fujian.clearfix')
 
     return {
       description: trimAndDefine(result('div.list.calendar.clearfix > div.fl.right > div.c55').slice(0, 1).html()),
@@ -674,20 +686,20 @@ export class Learn2018Helper {
       answerAttachment: this.parseHomeworkFile(fileDivs[1]),
       submittedAttachment: this.parseHomeworkFile(fileDivs[2]),
       gradeAttachment: this.parseHomeworkFile(fileDivs[3]),
-    };
+    }
   }
 
   private parseHomeworkFile(fileDiv: DOM.Element): RemoteFile | undefined {
-    const fileNode = ($(fileDiv)('.ftitle').children('a')[0] ?? $(fileDiv)('.fl').children('a')[0]) as DOM.Element;
+    const fileNode = ($(fileDiv)('.ftitle').children('a')[0] ?? $(fileDiv)('.fl').children('a')[0]) as DOM.Element
     if (fileNode !== undefined) {
-      const size = trimAndDefine($(fileDiv)('.fl > span[class^="color"]').first().text())!;
-      const params = new URLSearchParams(fileNode.attribs.href.split('?').slice(-1)[0]);
-      const attachmentId = params.get('fileId')!;
+      const size = trimAndDefine($(fileDiv)('.fl > span[class^="color"]').first().text())!
+      const params = new URLSearchParams(fileNode.attribs.href.split('?').slice(-1)[0])
+      const attachmentId = params.get('fileId')!
       // so dirty here...
-      let downloadUrl = URLS.LEARN_PREFIX + fileNode.attribs.href;
-      if (params.has('downloadUrl')) {
-        downloadUrl = URLS.LEARN_PREFIX + params.get('downloadUrl')!;
-      }
+      let downloadUrl = URLS.LEARN_PREFIX + fileNode.attribs.href
+      if (params.has('downloadUrl'))
+        downloadUrl = URLS.LEARN_PREFIX + params.get('downloadUrl')!
+
       return {
         id: attachmentId,
         name: (fileNode.children[0] as DOM.Text).data!,
@@ -699,9 +711,10 @@ export class Learn2018Helper {
           this.previewFirstPage,
         ),
         size,
-      };
-    } else {
-      return undefined;
+      }
+    }
+    else {
+      return undefined
     }
   }
 
@@ -715,7 +728,7 @@ export class Learn2018Helper {
       lastReplierName: d.zhhfrxm,
       visitCount: d.djs ?? 0, // teacher cannot fetch this
       replyCount: d.hfcs,
-    };
+    }
   }
 
   public async submitHomework(
@@ -729,19 +742,19 @@ export class Learn2018Helper {
         method: 'POST',
         body: URLS.LEARN_HOMEWORK_SUBMIT_FORM_DATA(studentHomeworkID, content, attachment, removeAttachment),
       })
-    ).json();
+    ).json()
   }
 
   public async setLanguage(lang: Language): Promise<void> {
     await this.#myFetchWithToken(URLS.LEARN_WEBSITE_LANGUAGE(lang), {
       method: 'POST',
-    });
-    this.#lang = lang;
+    })
+    this.#lang = lang
   }
 
   public getCurrentLanguage(): Language {
-    return this.#lang;
+    return this.#lang
   }
 }
 
-export * from './types';
+export * from './types'

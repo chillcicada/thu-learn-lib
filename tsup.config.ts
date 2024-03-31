@@ -1,4 +1,5 @@
-import { Options, defineConfig } from 'tsup';
+import type { Options } from 'tsup'
+import { defineConfig } from 'tsup'
 
 const COMMON_OPTIONS: Options = {
   globalName: 'LearnLib',
@@ -8,9 +9,9 @@ const COMMON_OPTIONS: Options = {
   esbuildOptions: (options, context) => {
     if (context.format === 'iife') {
       options.alias = {
-        parse5: 'fake-parse5',
+        'parse5': 'fake-parse5',
         'parse5-htmlparser2-tree-adapter': 'fake-parse5',
-      };
+      }
     }
   },
   terserOptions: {
@@ -19,7 +20,7 @@ const COMMON_OPTIONS: Options = {
       ecma: 2018,
     },
   },
-};
+}
 
 export default defineConfig([
   {
@@ -34,4 +35,4 @@ export default defineConfig([
     minify: 'terser',
     sourcemap: true,
   },
-]);
+])

@@ -1,17 +1,16 @@
-import { decodeHTML as _decodeHTML } from 'entities';
+import { decodeHTML as _decodeHTML } from 'entities'
 
-import { SemesterType, FailReason, ContentType, HomeworkGradeLevel } from './types';
+import { ContentType, FailReason, HomeworkGradeLevel, SemesterType } from './types'
 
 export function parseSemesterType(n: number): SemesterType {
-  if (n === 1) {
-    return SemesterType.FALL;
-  } else if (n === 2) {
-    return SemesterType.SPRING;
-  } else if (n === 3) {
-    return SemesterType.SUMMER;
-  } else {
-    return SemesterType.UNKNOWN;
-  }
+  if (n === 1)
+    return SemesterType.FALL
+  else if (n === 2)
+    return SemesterType.SPRING
+  else if (n === 3)
+    return SemesterType.SUMMER
+  else
+    return SemesterType.UNKNOWN
 }
 
 const CONTENT_TYPE_MK_MAP = new Map([
@@ -20,14 +19,14 @@ const CONTENT_TYPE_MK_MAP = new Map([
   [ContentType.HOMEWORK, 'kczy'],
   [ContentType.DISCUSSION, ''],
   [ContentType.QUESTION, ''],
-]);
+])
 
 export function getMkFromType(type: ContentType): string {
-  return 'mk_' + (CONTENT_TYPE_MK_MAP.get(type) ?? 'UNKNOWN');
+  return `mk_${CONTENT_TYPE_MK_MAP.get(type) ?? 'UNKNOWN'}`
 }
 
 export function decodeHTML(html: string): string {
-  const text = _decodeHTML(html ?? '');
+  const text = _decodeHTML(html ?? '')
   // remove strange prefixes returned by web learning
   return text.startsWith('\xC2\x9E\xC3\xA9\x65')
     ? text.slice(5)
@@ -35,15 +34,15 @@ export function decodeHTML(html: string): string {
       ? text.slice(3)
       : text.startsWith('\xE9\x65')
         ? text.slice(2)
-        : text;
+        : text
 }
 
 export function trimAndDefine(text: string | undefined | null): string | undefined {
-  if (text === undefined || text === null) {
-    return undefined;
-  }
-  const trimmed = text.trim();
-  return trimmed === '' ? undefined : decodeHTML(trimmed);
+  if (text === undefined || text === null)
+    return undefined
+
+  const trimmed = text.trim()
+  return trimmed === '' ? undefined : decodeHTML(trimmed)
 }
 
 export const GRADE_LEVEL_MAP = new Map([
@@ -72,15 +71,16 @@ export const GRADE_LEVEL_MAP = new Map([
   [-50, HomeworkGradeLevel.INCOMPLETE],
   [-31, HomeworkGradeLevel.NA],
   [-30, HomeworkGradeLevel.F],
-]);
+])
 
-export const JSONP_EXTRACTOR_NAME = 'thu_learn_lib_jsonp_extractor';
+export const JSONP_EXTRACTOR_NAME = 'thu_learn_lib_jsonp_extractor'
 
 export function extractJSONPResult(jsonp: string): any {
   // check jsonp format
-  if (!jsonp.startsWith(JSONP_EXTRACTOR_NAME)) {
-    throw FailReason.INVALID_RESPONSE;
-  }
+  if (!jsonp.startsWith(JSONP_EXTRACTOR_NAME))
+    throw FailReason.INVALID_RESPONSE
+
   // evaluate the result
-  return Function(`"use strict";const ${JSONP_EXTRACTOR_NAME}=(s)=>s;return ${jsonp};`)();
+  // eslint-disable-next-line no-new-func
+  return Function(`"use strict";const ${JSONP_EXTRACTOR_NAME}=(s)=>s;return ${jsonp};`)()
 }

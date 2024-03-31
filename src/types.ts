@@ -1,14 +1,14 @@
-import type { CookieJar } from 'tough-cookie';
+import type { CookieJar } from 'tough-cookie'
 
-export type Fetch = typeof globalThis.fetch;
-export type Credential = { username?: string; password?: string };
-export type CredentialProvider = () => Credential | Promise<Credential>;
-export type HelperConfig = {
-  provider?: CredentialProvider;
-  fetch?: Fetch;
-  cookieJar?: CookieJar;
-  generatePreviewUrlForFirstPage?: boolean;
-};
+export type Fetch = typeof globalThis.fetch
+export interface Credential { username?: string, password?: string }
+export type CredentialProvider = () => Credential | Promise<Credential>
+export interface HelperConfig {
+  provider?: CredentialProvider
+  fetch?: Fetch
+  cookieJar?: CookieJar
+  generatePreviewUrlForFirstPage?: boolean
+}
 
 export enum FailReason {
   NO_CREDENTIAL = 'no credential provided',
@@ -22,8 +22,8 @@ export enum FailReason {
 }
 
 export interface ApiError {
-  reason: FailReason;
-  extra?: unknown;
+  reason: FailReason
+  extra?: unknown
 }
 
 export enum SemesterType {
@@ -42,22 +42,22 @@ export enum ContentType {
 }
 
 interface IUserInfo {
-  name: string;
-  department: string;
+  name: string
+  department: string
 }
 
-export type UserInfo = IUserInfo;
+export type UserInfo = IUserInfo
 
 interface ISemesterInfo {
-  id: string;
-  startDate: Date;
-  endDate: Date;
-  startYear: number;
-  endYear: number;
-  type: SemesterType;
+  id: string
+  startDate: Date
+  endDate: Date
+  startYear: number
+  endYear: number
+  type: SemesterType
 }
 
-export type SemesterInfo = ISemesterInfo;
+export type SemesterInfo = ISemesterInfo
 
 export enum CourseType {
   STUDENT = 'student',
@@ -65,75 +65,75 @@ export enum CourseType {
 }
 
 interface ICourseInfo {
-  id: string;
-  name: string;
-  chineseName: string;
-  englishName: string;
-  timeAndLocation: string[];
-  url: string;
-  teacherName: string;
-  teacherNumber: string;
-  courseNumber: string;
-  courseIndex: number;
-  courseType: CourseType;
+  id: string
+  name: string
+  chineseName: string
+  englishName: string
+  timeAndLocation: string[]
+  url: string
+  teacherName: string
+  teacherNumber: string
+  courseNumber: string
+  courseIndex: number
+  courseType: CourseType
 }
 
-export type CourseInfo = ICourseInfo;
+export type CourseInfo = ICourseInfo
 
 interface IRemoteFile {
-  id: string;
-  name: string;
-  downloadUrl: string;
-  previewUrl: string;
-  size: string;
+  id: string
+  name: string
+  downloadUrl: string
+  previewUrl: string
+  size: string
 }
 
-export type RemoteFile = IRemoteFile;
+export type RemoteFile = IRemoteFile
 
 export interface INotification {
-  id: string;
-  title: string;
-  content: string;
-  hasRead: boolean;
-  url: string;
-  markedImportant: boolean;
-  publishTime: Date;
-  publisher: string;
+  id: string
+  title: string
+  content: string
+  hasRead: boolean
+  url: string
+  markedImportant: boolean
+  publishTime: Date
+  publisher: string
 }
 
 export interface INotificationDetail {
-  attachment?: RemoteFile;
+  attachment?: RemoteFile
 }
 
-export type Notification = INotification & INotificationDetail;
+export type Notification = INotification & INotificationDetail
 
 interface IFile {
-  id: string;
+  id: string
   /** size in byte */
-  rawSize: number;
+  rawSize: number
   /** inaccurate size description (like '1M') */
-  size: string;
-  title: string;
-  description: string;
-  uploadTime: Date;
+  size: string
+  title: string
+  description: string
+  uploadTime: Date
   /** for teachers, this url will not initiate download directly */
-  downloadUrl: string;
+  downloadUrl: string
   /** preview is not supported on all types of files, check before use */
-  previewUrl: string;
-  isNew: boolean;
-  markedImportant: boolean;
-  visitCount: number;
-  downloadCount: number;
-  fileType: string;
+  previewUrl: string
+  isNew: boolean
+  markedImportant: boolean
+  visitCount: number
+  downloadCount: number
+  fileType: string
   /** for compatibility */
-  remoteFile: RemoteFile;
+  remoteFile: RemoteFile
 }
 
-export type File = IFile;
+export type File = IFile
 
 export interface IHomeworkStatus {
-  submitted: boolean;
-  graded: boolean;
+  submitted: boolean
+  graded: boolean
 }
 
 export enum HomeworkGradeLevel {
@@ -172,36 +172,36 @@ export enum HomeworkGradeLevel {
 }
 
 export interface IHomework extends IHomeworkStatus {
-  id: string;
-  studentHomeworkId: string;
-  title: string;
-  deadline: Date;
-  url: string;
-  submitUrl: string;
-  submitTime?: Date;
-  grade?: number;
+  id: string
+  studentHomeworkId: string
+  title: string
+  deadline: Date
+  url: string
+  submitUrl: string
+  submitTime?: Date
+  grade?: number
   /** some homework has levels but not grades, like A/B/.../F */
-  gradeLevel?: HomeworkGradeLevel;
-  gradeTime?: Date;
-  graderName?: string;
-  gradeContent?: string;
+  gradeLevel?: HomeworkGradeLevel
+  gradeTime?: Date
+  graderName?: string
+  gradeContent?: string
 }
 
 export interface IHomeworkDetail {
-  description?: string;
+  description?: string
   /** attachment from teacher */
-  attachment?: RemoteFile;
+  attachment?: RemoteFile
   /** answer from teacher */
-  answerContent?: string;
-  answerAttachment?: RemoteFile;
+  answerContent?: string
+  answerAttachment?: RemoteFile
   /** submitted content from student */
-  submittedContent?: string;
-  submittedAttachment?: RemoteFile;
+  submittedContent?: string
+  submittedAttachment?: RemoteFile
   /** grade from teacher */
-  gradeAttachment?: RemoteFile;
+  gradeAttachment?: RemoteFile
 }
 
-export type Homework = IHomework & IHomeworkDetail;
+export type Homework = IHomework & IHomeworkDetail
 
 export enum HomeworkCompletionType {
   INDIVIDUA = 1,
@@ -214,81 +214,81 @@ export enum HomeworkSubmissionType {
 }
 
 export interface IHomeworkTA {
-  id: string;
-  index: number;
-  title: string;
-  description: string;
-  publisherId: string;
-  publishTime: Date;
-  startTime: Date;
-  deadline: Date;
-  url: string;
-  completionType: HomeworkCompletionType;
-  submissionType: HomeworkSubmissionType;
-  gradedCount: number;
-  submittedCount: number;
-  unsubmittedCount: number;
+  id: string
+  index: number
+  title: string
+  description: string
+  publisherId: string
+  publishTime: Date
+  startTime: Date
+  deadline: Date
+  url: string
+  completionType: HomeworkCompletionType
+  submissionType: HomeworkSubmissionType
+  gradedCount: number
+  submittedCount: number
+  unsubmittedCount: number
 }
 
-export type HomeworkTA = IHomeworkTA;
+export type HomeworkTA = IHomeworkTA
 
 export interface IHomeworkSubmitAttachment {
-  filename: string;
-  content: Blob;
+  filename: string
+  content: Blob
 }
 
 export interface IHomeworkSubmitResult {
-  result: 'success' | 'error';
-  msg: string;
-  object: unknown;
+  result: 'success' | 'error'
+  msg: string
+  object: unknown
 }
 
 export interface IDiscussionBase {
-  id: string;
-  title: string;
-  publisherName: string;
-  publishTime: Date;
-  lastReplierName: string;
-  lastReplyTime: Date;
-  visitCount: number;
-  replyCount: number;
+  id: string
+  title: string
+  publisherName: string
+  publishTime: Date
+  lastReplierName: string
+  lastReplyTime: Date
+  visitCount: number
+  replyCount: number
 }
 
 interface IDiscussion extends IDiscussionBase {
-  url: string;
-  boardId: string;
+  url: string
+  boardId: string
 }
 
-export type Discussion = IDiscussion;
+export type Discussion = IDiscussion
 
 interface IQuestion extends IDiscussionBase {
-  url: string;
-  question: string;
+  url: string
+  question: string
 }
 
-export type Question = IQuestion;
+export type Question = IQuestion
 
-export type ContentTypeMap = {
-  [ContentType.NOTIFICATION]: Notification;
-  [ContentType.FILE]: File;
-  [ContentType.HOMEWORK]: Homework;
-  [ContentType.DISCUSSION]: Discussion;
-  [ContentType.QUESTION]: Question;
-};
+export interface ContentTypeMap {
+  [ContentType.NOTIFICATION]: Notification
+  [ContentType.FILE]: File
+  [ContentType.HOMEWORK]: Homework
+  [ContentType.DISCUSSION]: Discussion
+  [ContentType.QUESTION]: Question
+}
 
 interface ICourseContent<T extends ContentType> {
-  [id: string]: ContentTypeMap[T][];
+  [id: string]: ContentTypeMap[T][]
 }
 
-export type CourseContent<T extends ContentType> = ICourseContent<T>;
+export type CourseContent<T extends ContentType> = ICourseContent<T>
 
 export interface CalendarEvent {
-  location: string;
-  status: string;
-  startTime: string;
-  endTime: string;
-  date: string;
-  courseName: string;
+  location: string
+  status: string
+  startTime: string
+  endTime: string
+  date: string
+  courseName: string
 }
 
 export enum Language {

@@ -1,0 +1,15 @@
+{
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "prepare": "pnpm -w build",
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "thu-learn-lib": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "5.2.6"
+  }
+}
