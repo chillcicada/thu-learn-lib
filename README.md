@@ -38,7 +38,7 @@ The library is exposed under `window.LearnLib`.
 
 ```html
 <script type="module">
-  import { Learn2018Helper } from 'https://esm.sh/thu-learn-lib@3';
+  import { Learn2018Helper } from 'https://esm.sh/thu-learn-lib@3'
 </script>
 ```
 

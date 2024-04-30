@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import * as dotenv from 'dotenv'
 import { FailReason, Learn2018Helper } from '../src'
-
-dotenv.config({ path: 'test/.env' })
-const U = process.env.U! // username
-const P = process.env.P! // password
+import { P, U } from './utils'
 
 describe('helper authentication', () => {
   it('should login & logout correctly if account is right', async () => {

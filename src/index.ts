@@ -1,8 +1,10 @@
 /* eslint-disable prefer-promise-reject-errors */
 import * as cheerio from 'cheerio'
-import type * as DOM from 'domhandler'
 import { Base64 } from 'js-base64'
 import makeFetch from 'node-fetch-cookie-native'
+
+import type { Element, Text } from 'domhandler'
+import type { CheerioAPI, CheerioOptions } from 'cheerio'
 
 import * as URLS from './urls'
 import type {
@@ -46,13 +48,13 @@ import {
   trimAndDefine,
 } from './utils'
 
-const CHEERIO_CONFIG: cheerio.CheerioOptions = {
+const CHEERIO_CONFIG: CheerioOptions = {
   // _useHtmlParser2
   xml: true,
   decodeEntities: false,
 }
 
-function $(html: string | DOM.Element | DOM.Element[]): cheerio.CheerioAPI {
+function $(html: string | Element | Element[]): CheerioAPI {
   return cheerio.load(html, CHEERIO_CONFIG)
 }
 
@@ -689,8 +691,8 @@ export class Learn2018Helper {
     }
   }
 
-  private parseHomeworkFile(fileDiv: DOM.Element): RemoteFile | undefined {
-    const fileNode = ($(fileDiv)('.ftitle').children('a')[0] ?? $(fileDiv)('.fl').children('a')[0]) as DOM.Element
+  private parseHomeworkFile(fileDiv: Element): RemoteFile | undefined {
+    const fileNode = ($(fileDiv)('.ftitle').children('a')[0] ?? $(fileDiv)('.fl').children('a')[0]) as Element
     if (fileNode !== undefined) {
       const size = trimAndDefine($(fileDiv)('.fl > span[class^="color"]').first().text())!
       const params = new URLSearchParams(fileNode.attribs.href.split('?').slice(-1)[0])
@@ -702,7 +704,7 @@ export class Learn2018Helper {
 
       return {
         id: attachmentId,
-        name: (fileNode.children[0] as DOM.Text).data!,
+        name: (fileNode.children[0] as Text).data!,
         downloadUrl,
         previewUrl: URLS.LEARN_FILE_PREVIEW(
           ContentType.HOMEWORK,

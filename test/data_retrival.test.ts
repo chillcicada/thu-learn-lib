@@ -1,10 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import * as dotenv from 'dotenv'
 import { CourseType, Language, Learn2018Helper } from '../src'
-
-dotenv.config({ path: 'test/.env' })
-const U = process.env.U! // username
-const P = process.env.P! // password
+import { P, U } from './utils'
 
 describe('helper data retrival', () => {
   let helper: Learn2018Helper

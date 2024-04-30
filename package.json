@@ -3,11 +3,18 @@
   "type": "module",
   "version": "3.1.4",
   "description": "a JavaScript library to provide a program-friendly interface to Web Learning (2018) of Tsinghua University",
-  "author": "Harry Chen <harry-chen@outlook.com> (https://harrychen.xyz)",
+  "author": {
+    "name": "Harry Chen",
+    "email": "harry-chen@outlook.com",
+    "url": "https://harrychen.xyz"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Harry-Chen/thu-learn-lib.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Harry-Chen/thu-learn-lib/issues"
   },
   "keywords": [
     "tsinghua",
@@ -54,7 +61,6 @@
     "eslint": "8.57.0",
     "eslint-plugin-format": "0.1.0",
     "fake-parse5": "0.0.1",
-    "jsdom": "24.0.0",
     "lint-staged": "15.2.2",
     "simple-git-hooks": "2.11.1",
     "terser": "5.30.0",
