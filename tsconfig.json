@@ -3,9 +3,10 @@
     "target": "es2018",
     "module": "esnext",
     "moduleResolution": "bundler",
+    "types": ["vitest/globals"],
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true
   },
-  "include": ["src"]
+  "include": ["src", "test"]
 }

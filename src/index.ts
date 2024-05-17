@@ -1,8 +1,8 @@
 /* eslint-disable prefer-promise-reject-errors */
+import fetchCookie from 'fetch-cookie'
 import * as cheerio from 'cheerio'
 import type * as DOM from 'domhandler'
 import { Base64 } from 'js-base64'
-import makeFetch from 'node-fetch-cookie-native'
 
 import * as URLS from './urls'
 import type {
@@ -84,29 +84,8 @@ export class Learn2018Helper {
   readonly #withReAuth = (rawFetch: Fetch): Fetch => {
     const login = this.login.bind(this)
     return async function wrappedFetch(...args) {
-      const retryAfterLogin = async () => {
-        await login()
-        return await rawFetch(...args).then((res: Response) => {
-          if (noLogin(res)) {
-            return Promise.reject({
-              reason: FailReason.NOT_LOGGED_IN,
-            } as ApiError)
-          }
-          else if (res.status !== 200) {
-            return Promise.reject({
-              reason: FailReason.UNEXPECTED_STATUS,
-              extra: {
-                code: res.status,
-                text: res.statusText,
-              },
-            } as ApiError)
-          }
-          else {
-            return res
-          }
-        })
-      }
-      return await rawFetch(...args).then((res: Response) => (noLogin(res) ? retryAfterLogin() : res))
+      await login()
+      return await rawFetch(...args)
     }
   }
 
@@ -116,7 +95,7 @@ export class Learn2018Helper {
   constructor(config?: HelperConfig) {
     this.previewFirstPage = config?.generatePreviewUrlForFirstPage ?? true
     this.#provider = config?.provider
-    this.#rawFetch = config?.fetch ?? makeFetch(config?.cookieJar)
+    this.#rawFetch = fetchCookie(fetch)
     this.#myFetch = this.#provider
       ? this.#withReAuth(this.#rawFetch)
       : async (...args) => {
@@ -163,9 +142,7 @@ export class Learn2018Helper {
     }
     // check response from id.tsinghua.edu.cn
     const ticketResult = await ticketResponse.text()
-    const body = $(ticketResult)
-    const targetURL = body('a').attr('href') as string
-    const ticket = targetURL.split('=').slice(-1)[0]
+    const ticket = ticketResult.match(/ticket=([^"]+)/)?.[1] || ''
     if (ticket === 'BAD_CREDENTIALS') {
       return Promise.reject({
         reason: FailReason.BAD_CREDENTIAL,
@@ -177,20 +154,18 @@ export class Learn2018Helper {
         reason: FailReason.ERROR_ROAMING,
       } as ApiError)
     }
-    const courseListPageSource: string = await (await this.#rawFetch(URLS.LEARN_STUDENT_COURSE_LIST_PAGE())).text()
-    const tokenRegex = /^.*&_csrf=(\S*)".*$/gm
-    const tokenMatches = [...courseListPageSource.matchAll(tokenRegex)]
-    if (tokenMatches.length === 0) {
-      return Promise.reject({
-        reason: FailReason.INVALID_RESPONSE,
-        extra: 'cannot fetch CSRF token from source',
-      } as ApiError)
-    }
-    this.#csrfToken = tokenMatches[0][1]
-    const langRegex = /<script src="\/f\/wlxt\/common\/languagejs\?lang=(zh|en)"><\/script>/g
-    const langMatches = [...courseListPageSource.matchAll(langRegex)]
-    if (langMatches.length !== 0)
-      this.#lang = langMatches[0][1] as Language
+    const token = await fetch(loginResponse.url).then((res) => {
+      if (!res.ok)
+        return Promise.reject(new Error('Failed to get course list page'))
+
+      const tokenRaw = res.headers.get('set-cookie')?.match(/XSRF-TOKEN=([^;]+)/)
+      return tokenRaw ? tokenRaw[1] : ''
+    })
+    this.#csrfToken = token[0][1]
+    // const langRegex = /<script src="\/f\/wlxt\/common\/languagejs\?lang=(zh|en)"><\/script>/g
+    // const langMatches = [...courseListPageSource.matchAll(langRegex)]
+    // if (langMatches.length !== 0)
+    //   this.#lang = langMatches[0][1] as Language
   }
 
   /**  logout (to make everyone happy) */
@@ -254,7 +229,9 @@ export class Learn2018Helper {
   }
 
   public async getSemesterIdList(): Promise<string[]> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_SEMESTER_LIST())).json()
+    const res = await this.#myFetchWithToken(URLS.LEARN_SEMESTER_LIST()).catch(Promise.reject)
+
+    const json = await res.json()
     if (!Array.isArray(json)) {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
@@ -267,7 +244,9 @@ export class Learn2018Helper {
   }
 
   public async getCurrentSemester(): Promise<SemesterInfo> {
-    const json = await (await this.#myFetchWithToken(URLS.LEARN_CURRENT_SEMESTER())).json()
+    const res = await this.#myFetchWithToken(URLS.LEARN_CURRENT_SEMESTER())
+
+    const json = await (res).json()
     if (json.message !== 'success') {
       return Promise.reject({
         reason: FailReason.INVALID_RESPONSE,
