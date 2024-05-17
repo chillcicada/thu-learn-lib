@@ -1,0 +1,85 @@
+{
+  "name": "learn-helper",
+  "displayName": "Learn Helper",
+  "type": "module",
+  "version": "4.6.3",
+  "private": true,
+  "author": "Harry Chen",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Harry-Chen/Learn-Helper"
+  },
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "compile": "tsc --noEmit",
+    "postinstall": "wxt prepare",
+    "lingui:extract": "lingui extract"
+  },
+  "dependencies": {
+    "@emotion/react": "11.11.4",
+    "@emotion/styled": "11.11.5",
+    "@iconify-json/fa6-solid": "1.1.20",
+    "@lingui/core": "4.7.2",
+    "@lingui/macro": "4.7.2",
+    "@lingui/react": "4.7.2",
+    "@mui/material": "5.15.14",
+    "@reduxjs/toolkit": "2.2.2",
+    "classnames": "2.5.1",
+    "compare-versions": "6.1.0",
+    "fake-parse5": "0.0.1",
+    "material-ui-popup-state": "5.1.0",
+    "notistack": "3.0.1",
+    "proxy-memoize": "2.0.5",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-error-boundary": "4.0.13",
+    "react-iframe": "1.8.5",
+    "react-is": "18.2.0",
+    "react-redux": "9.1.0",
+    "redux-logger": "3.0.6",
+    "thu-learn-lib": "workspace:*"
+  },
+  "devDependencies": {
+    "@lingui/cli": "4.7.2",
+    "@lingui/swc-plugin": "4.0.6",
+    "@lingui/vite-plugin": "4.7.2",
+    "@mdx-js/rollup": "3.0.1",
+    "@svgr/core": "8.1.0",
+    "@svgr/plugin-jsx": "8.1.0",
+    "@swc/core": "1.3.105",
+    "@types/randomstring": "1.1.12",
+    "@types/react": "18.2.73",
+    "@types/react-dom": "18.2.23",
+    "@types/redux-logger": "3.0.13",
+    "@vitejs/plugin-react-swc": "3.6.0",
+    "randomstring": "1.3.0",
+    "rehype-mdx-import-media": "1.1.1",
+    "remark-unwrap-images": "4.0.0",
+    "rollup-plugin-visualizer": "5.12.0",
+    "terser": "5.30.0",
+    "unplugin-icons": "0.18.5",
+    "wxt": "0.17.10"
+  },
+  "browserslist": {
+    "development": [
+      "last 1 Chrome version",
+      "last 1 Firefox version",
+      "last 1 Edge version"
+    ],
+    "production": [
+      "> 1%",
+      "last 2 versions",
+      "not dead",
+      "not op_mini all",
+      "not IE 11"
+    ]
+  }
+}
