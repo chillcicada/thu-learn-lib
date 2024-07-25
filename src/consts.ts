@@ -1,0 +1,30 @@
+export const MAX_SIZE = 100
+export const HomeworkGradeLevel = {
+  CHECKED: 'checked',
+  DISTINCTION: 'distinction',
+  EXEMPTED_COURSE: 'exempted course',
+  EX: 'EX',
+  EXEMPTION: 'exemption',
+
+  A_PLUS: 'A+',
+  A: 'A',
+  A_MINUS: 'A-',
+  B_PLUS: 'B+',
+  B: 'B',
+  B_MINUS: 'B-',
+  C_PLUS: 'C+',
+  C: 'C',
+  C_MINUS: 'C-',
+  G: 'G',
+  D_PLUS: 'D+',
+  D: 'D',
+  P: 'P',
+  F: 'F',
+
+  PASS: 'pass',
+  FAILURE: 'failure',
+  W: 'W',
+  I: 'I',
+  INCOMPLETE: 'incomplete',
+  NA: 'NA',
+} as const

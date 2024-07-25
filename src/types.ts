@@ -1,54 +1,30 @@
-import type { CookieJar } from 'tough-cookie'
+import type { HomeworkGradeLevel } from './consts'
 
-export type Fetch = typeof globalThis.fetch
-export interface Credential { username?: string, password?: string }
-export type CredentialProvider = () => Credential | Promise<Credential>
-export interface HelperConfig {
-  provider?: CredentialProvider
-  fetch?: Fetch
-  cookieJar?: CookieJar
-  generatePreviewUrlForFirstPage?: boolean
+export type IdentityType = 'student' | 'teacher'
+
+export type Language = 'zh' | 'en'
+
+export type WebsiteShowLanguage = 'zh_CN' | 'en_US'
+
+export type SemesterType = 'spring' | 'fall' | 'summer' | 'unknown'
+
+export type ResultStatus = 'success' | 'error'
+
+export interface CalendarEvent {
+  location: string
+  status: string
+  startTime: string
+  endTime: string
+  date: string
+  courseName: string
 }
 
-export enum FailReason {
-  NO_CREDENTIAL = 'no credential provided',
-  ERROR_FETCH_FROM_ID = 'could not fetch ticket from id.tsinghua.edu.cn',
-  BAD_CREDENTIAL = 'bad credential',
-  ERROR_ROAMING = 'could not roam to learn.tsinghua.edu.cn',
-  NOT_LOGGED_IN = 'not logged in or login timeout',
-  NOT_IMPLEMENTED = 'not implemented',
-  INVALID_RESPONSE = 'invalid response',
-  UNEXPECTED_STATUS = 'unexpected status',
-}
-
-export interface ApiError {
-  reason: FailReason
-  extra?: unknown
-}
-
-export enum SemesterType {
-  FALL = 'fall',
-  SPRING = 'spring',
-  SUMMER = 'summer',
-  UNKNOWN = '',
-}
-
-export enum ContentType {
-  NOTIFICATION = 'notification',
-  FILE = 'file',
-  HOMEWORK = 'homework',
-  DISCUSSION = 'discussion',
-  QUESTION = 'question',
-}
-
-interface IUserInfo {
+export interface UserInfo {
   name: string
   department: string
 }
 
-export type UserInfo = IUserInfo
-
-interface ISemesterInfo {
+export interface SemesterInfo {
   id: string
   startDate: Date
   endDate: Date
@@ -57,14 +33,7 @@ interface ISemesterInfo {
   type: SemesterType
 }
 
-export type SemesterInfo = ISemesterInfo
-
-export enum CourseType {
-  STUDENT = 'student',
-  TEACHER = 'teacher',
-}
-
-interface ICourseInfo {
+export interface CourseInfo {
   id: string
   name: string
   chineseName: string
@@ -75,23 +44,23 @@ interface ICourseInfo {
   teacherNumber: string
   courseNumber: string
   courseIndex: number
-  courseType: CourseType
+  identityType: IdentityType
 }
 
-export type CourseInfo = ICourseInfo
-
-interface IRemoteFile {
-  id: string
+export interface RemoteFile {
+  id: string | number
   name: string
   downloadUrl: string
   previewUrl: string
-  size: string
+  size: string | number
 }
 
-export type RemoteFile = IRemoteFile
+export interface NotificationDetail {
+  attachment?: RemoteFile
+}
 
-export interface INotification {
-  id: string
+export interface NotificationItem extends NotificationDetail {
+  id: string | number
   title: string
   content: string
   hasRead: boolean
@@ -101,18 +70,12 @@ export interface INotification {
   publisher: string
 }
 
-export interface INotificationDetail {
-  attachment?: RemoteFile
-}
-
-export type Notification = INotification & INotificationDetail
-
-interface IFile {
-  id: string
+export interface FileItem {
+  id: string | number
   /** size in byte */
   rawSize: number
   /** inaccurate size description (like '1M') */
-  size: string
+  size: string | number
   title: string
   description: string
   uploadTime: Date
@@ -129,51 +92,14 @@ interface IFile {
   remoteFile: RemoteFile
 }
 
-export type File = IFile
-
-export interface IHomeworkStatus {
+export interface HomeworkStatus {
   submitted: boolean
   graded: boolean
 }
 
-export enum HomeworkGradeLevel {
-  /** 已阅 */
-  CHECKED = 'checked',
-  A_PLUS = 'A+',
-  A = 'A',
-  A_MINUS = 'A-',
-  B_PLUS = 'B+',
-  /** 优秀 */
-  DISTINCTION = 'distinction',
-  B = 'B',
-  B_MINUS = 'B-',
-  C_PLUS = 'C+',
-  C = 'C',
-  C_MINUS = 'C-',
-  G = 'G',
-  D_PLUS = 'D+',
-  D = 'D',
-  /** 免课 */
-  EXEMPTED_COURSE = 'exempted course',
-  P = 'P',
-  EX = 'EX',
-  /** 免修 */
-  EXEMPTION = 'exemption',
-  /** 通过 */
-  PASS = 'pass',
-  /** 不通过 */
-  FAILURE = 'failure',
-  W = 'W',
-  I = 'I',
-  /** 缓考 */
-  INCOMPLETE = 'incomplete',
-  NA = 'NA',
-  F = 'F',
-}
-
-export interface IHomework extends IHomeworkStatus {
-  id: string
-  studentHomeworkId: string
+export interface HomeworkBase extends HomeworkStatus {
+  id: string | number
+  stuHomeworkId: string | number
   title: string
   deadline: Date
   url: string
@@ -181,13 +107,13 @@ export interface IHomework extends IHomeworkStatus {
   submitTime?: Date
   grade?: number
   /** some homework has levels but not grades, like A/B/.../F */
-  gradeLevel?: HomeworkGradeLevel
+  gradeLevel?: keyof typeof HomeworkGradeLevel
   gradeTime?: Date
   graderName?: string
   gradeContent?: string
 }
 
-export interface IHomeworkDetail {
+export interface HomeworkDetail {
   description?: string
   /** attachment from teacher */
   attachment?: RemoteFile
@@ -201,17 +127,11 @@ export interface IHomeworkDetail {
   gradeAttachment?: RemoteFile
 }
 
-export type Homework = IHomework & IHomeworkDetail
+export type Homework = HomeworkStatus & HomeworkDetail
 
-export enum HomeworkCompletionType {
-  INDIVIDUA = 1,
-  GRUOP = 2,
-}
+export type HomeworkCompletionType = 'individual' | 'group'
 
-export enum HomeworkSubmissionType {
-  WEB_LEARNING = 2,
-  OFFLINE = 0,
-}
+export type HomeworkSubmissionType = 'offline' | 'webLearning'
 
 export interface IHomeworkTA {
   id: string
@@ -230,20 +150,19 @@ export interface IHomeworkTA {
   unsubmittedCount: number
 }
 
-export type HomeworkTA = IHomeworkTA
-
-export interface IHomeworkSubmitAttachment {
+export interface HomeworkSubmitAttachment {
   filename: string
   content: Blob
 }
 
-export interface IHomeworkSubmitResult {
-  result: 'success' | 'error'
-  msg: string
+// TODO: Add transition rules
+export interface HomeworkSubmitResult {
+  result: ResultStatus
+  message: string
   object: unknown
 }
 
-export interface IDiscussionBase {
+export interface DiscussionBase {
   id: string
   title: string
   publisherName: string
@@ -254,44 +173,29 @@ export interface IDiscussionBase {
   replyCount: number
 }
 
-interface IDiscussion extends IDiscussionBase {
+export interface Discussion extends DiscussionBase {
   url: string
   boardId: string
 }
 
-export type Discussion = IDiscussion
-
-interface IQuestion extends IDiscussionBase {
+export interface Question extends DiscussionBase {
   url: string
   question: string
 }
 
-export type Question = IQuestion
-
-export interface ContentTypeMap {
-  [ContentType.NOTIFICATION]: Notification
-  [ContentType.FILE]: File
-  [ContentType.HOMEWORK]: Homework
-  [ContentType.DISCUSSION]: Discussion
-  [ContentType.QUESTION]: Question
+export interface ContentMap {
+  notification: NotificationItem
+  file: FileItem
+  homework: HomeworkStatus
+  discussion: Discussion
+  question: Question
+  unknown: unknown
 }
 
-interface ICourseContent<T extends ContentType> {
-  [id: string]: ContentTypeMap[T][]
+export type ContentType = keyof ContentMap
+
+export interface CourseContent<T extends ContentType> {
+  [id: string | number]: ContentMap[T][]
 }
 
-export type CourseContent<T extends ContentType> = ICourseContent<T>
-
-export interface CalendarEvent {
-  location: string
-  status: string
-  startTime: string
-  endTime: string
-  date: string
-  courseName: string
-}
-
-export enum Language {
-  ZH = 'zh',
-  EN = 'en',
-}
+export type { HomeworkGradeLevel }
