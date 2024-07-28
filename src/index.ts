@@ -1,4 +1,3 @@
-import { decodeHTML } from 'entities'
 import type {
   ContentType,
   CourseInfo,
@@ -12,7 +11,7 @@ import type {
   UserInfo,
 } from './types'
 import urls from './urls'
-import { $, base64ToUtf8, parseSemesterType } from './utils'
+import { $, addCSRFTokenToUrl, base64ToUtf8, decodeHTML, parseSemesterType } from './utils'
 
 // #region interface
 export interface Learn2018HelperConfig {
@@ -24,6 +23,11 @@ export interface Learn2018HelperOption {
   useHeartbeat: boolean
   language: Language
   previewFirstPage: boolean
+}
+
+export interface FetchWithAuthOption {
+  useCSRFToken: boolean
+  fetchImpl: typeof fetch
 }
 // #endregion
 
@@ -78,7 +82,7 @@ export default class Learn2018Helper {
     }
   }
 
-  get isUseHeartbeat() { return this.#previewFirstPage }
+  get isUseHeartbeat() { return this.#useHeartbeat }
 
   get currentLang() { return this.#language }
 
@@ -126,7 +130,11 @@ export default class Learn2018Helper {
     return await this.login().then(() => this.#cookie)
   }
 
-  async fetchWithAuth(url: string | URL | Request, init: RequestInit = {}): Promise<Response> {
+  async fetchWithAuth(
+    url: string | URL | Request,
+    init: RequestInit = {},
+    opt: Partial<FetchWithAuthOption> = {},
+  ): Promise<Response> {
     const cookie = this.#cookie
 
     if (!cookie)
@@ -134,7 +142,12 @@ export default class Learn2018Helper {
 
     const { headers = {}, ...rest } = init
 
-    return fetch(url, { headers: { ...headers, cookie }, ...rest })
+    const { useCSRFToken = true, fetchImpl = fetch } = opt
+
+    if (useCSRFToken)
+      url = addCSRFTokenToUrl(url, cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '')
+
+    return fetchImpl(url, { headers: { ...headers, cookie }, ...rest })
   }
 
   async logout(): Promise<this> {
@@ -147,10 +160,10 @@ export default class Learn2018Helper {
     if (!this.#identityType)
       throw new Error('Identity type is required')
 
-    const res = await this.fetchWithAuth(urls.HomePageUrlProvider(this.#identityType))
+    const text = await this.fetchWithAuth(urls.HomePageUrlProvider(this.#identityType))
       .then(res => res.text())
 
-    const dom = $(res)
+    const dom = $(text)
 
     const name = dom('a.user-log')?.text().trim() || ''
     const department = dom('.fl.up-img-info p:nth-child(2) label')?.text().trim() || ''
@@ -179,26 +192,26 @@ export default class Learn2018Helper {
 
   // }
 
-  private async _getSemesterList(): Promise<string[]> {
-    const res: string[] = await this.fetchWithAuth(urls.SemesterListUrl)
+  private async _getSemesterIdList(): Promise<string[]> {
+    const json: string[] = await this.fetchWithAuth(urls.SemesterListUrl)
       .then(res => res.json())
 
-    this.#semesterList = res.filter(i => i !== null)
+    this.#semesterList = json.filter(i => i !== null)
     return this.#semesterList
   }
 
-  async getSemesterList(): Promise<string[]> {
+  async getSemesterIdList(): Promise<string[]> {
     if (this.#semesterList)
       return this.#semesterList
 
-    return await this._getSemesterList()
+    return await this._getSemesterIdList()
   }
 
   private async _getCurrentSemester(): Promise<SemesterInfo> {
-    const res = await this.fetchWithAuth(urls.CurrentSemesterUrl)
+    const json = await this.fetchWithAuth(urls.CurrentSemesterUrl)
       .then(res => res.json())
 
-    const { id, kssj, jssj, xnxq } = res.result
+    const { id, kssj, jssj, xnxq } = json.result
 
     const regex = /^(\d{4})-(\d{4})-(\d)$/
 
@@ -231,13 +244,13 @@ export default class Learn2018Helper {
     semesterID: string,
     identityType: IdentityType = 'student',
   ): Promise<CourseInfo[]> {
-    const res = await this.fetchWithAuth(
+    const json = await this.fetchWithAuth(
       identityType === 'student'
         ? urls.StuCoursesListUrlProvider(semesterID, this.#language)
         : urls.TeaCoursesListUrlProvider(semesterID), // teacher
     ).then(res => res.json())
 
-    const { resultList = {} } = res
+    const { resultList = {} } = json
     const courses: CourseInfo[] = this.#courseLists[semesterID] = []
 
     await Promise.all(resultList.map(async (course: any) => {
@@ -245,14 +258,14 @@ export default class Learn2018Helper {
         .then(res => res.json())
 
       const {
-        wlkcid: id,
-        zywkcm: _name,
-        kcm: _chineseName,
-        ywkcm: _englishName,
-        jsm: teacherName,
-        jsh: teacherNumber,
-        kch: courseNumber,
-        kxh: _courseIndex,
+        wlkcid: id, // 网络课程ID
+        zywkcm: _name, // 中英文课程名
+        kcm: _chineseName, // 课程名
+        ywkcm: _englishName, // 英文课程名
+        jsm: teacherName, // 教师名
+        jsh: teacherNumber, // 教师号
+        kch: courseNumber, // 课程号
+        kxh: _courseIndex, // 课序号
       } = course
 
       courses.push({
@@ -304,13 +317,13 @@ export default class Learn2018Helper {
   }
 
   async getNotificationList(courseID: string, identityType: IdentityType = 'student'): Promise<NotificationItem[]> {
-    const res = await this.fetchWithAuth(
+    const json = await this.fetchWithAuth(
       identityType === 'student'
         ? urls.StuNotificationListUrlProvider(courseID)
         : urls.TeaNotificationListUrlProvider(courseID),
     ).then(res => res.json())
 
-    const result = res.object?.aaData ?? res.object?.resultsList ?? []
+    const result = json.object?.aaData ?? json.object?.resultsList ?? []
 
     const notifications: NotificationItem[] = []
 
@@ -376,10 +389,11 @@ export default class Learn2018Helper {
       : body.set('fileupload', 'undifined')
     body.set('isDeleted', removeAttachment ? '1' : '0')
 
-    const res: HomeworkSubmitResult = await this.fetchWithAuth(urls.StuHomeworkSubmitPostUrl, { body, method: 'POST' })
+    const json: HomeworkSubmitResult = await this.fetchWithAuth(urls.StuHomeworkSubmitPostUrl, { body, method: 'POST' })
       .then(res => res.json())
 
-    return res
+    // TODO
+    return json
   }
 
   // TODO: add specific methods update methods
@@ -390,7 +404,7 @@ export default class Learn2018Helper {
   async updateAll(): Promise<this> {
     return Promise.all([
       this._getUserInfo(),
-      this._getSemesterList(),
+      this._getSemesterIdList(),
       this._getCurrentSemester(),
       // this._getCourseList(this.#currentSemester?.id ?? '', this.#identityType ?? 'student'),
     ]).then(() => this)
@@ -413,8 +427,8 @@ export default class Learn2018Helper {
   // TODO: Implement this method
   private async heartbeat(): Promise<void> {
     await this.validateLogin()
-    ;(async () => {
-      await this.fetchWithAuth(urls.HomePageUrlProvider('student'))
+    ;(() => {
+      setTimeout(() => this.heartbeat(), 1000 * 60 * 5)
     })()
   }
 
@@ -423,10 +437,10 @@ export default class Learn2018Helper {
       return false
 
     // both student page and teacher page can get accessed when logged in
-    const res = await this.fetchWithAuth(urls.HomePageUrlProvider('student'))
+    const text = await this.fetchWithAuth(urls.HomePageUrlProvider('student'))
       .then(res => res.text())
 
-    if (res.includes('登录超时'))
+    if (text.includes('登录超时'))
       return false
 
     return true
@@ -437,7 +451,7 @@ export default class Learn2018Helper {
     return this
   }
 
-  setLanguage(value: Language): this {
+  setLanguage(value: Language = 'zh'): this {
     this.#language = value
     return this
   }

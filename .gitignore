@@ -6,5 +6,5 @@ node_modules
 .vscode
 .temp
 .history
-__snapshots__
+/test/__snapshots__/index.spec.ts.snap
 .wxt
